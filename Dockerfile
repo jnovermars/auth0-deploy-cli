@@ -1,4 +1,4 @@
-FROM node:latest
+FROM node:current-slim
 
 MAINTAINER https://github.com/jnovermars/auth0-deploy-cli
 
