@@ -1,0 +1,61 @@
+name: Tag Docker Image with Git
+
+on:
+  push:
+    tags: [ v* ]
+
+env:
+  IMAGE_NAME: jovermars/auth0-deploy-cli
+  TEST_TAG: ${{IMAGE_NAME}}:test
+  LATEST_TAG: ${{IMAGE_NAME}}:latest
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        
+    - name: Build and export to Docker
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        load: true
+        tags: ${{ env.TEST_TAG }}
+        
+    - name: Test
+      id: test
+      run: |
+        docker run --rm ${{ env.TEST_TAG }} 0deploy --version     
+        
+
+    - name: Extract metadata for the Docker image
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE_NAME }}
+        tags: |
+          type=semver,pattern=v{{major}}.{{minor}}.{{patch}},value=${{ steps.tests.outputs.stdout }}
+          type=semver,pattern=v{{major}}.{{minor}},value=${{ steps.tests.outputs.stdout }}
+          type=semver,pattern=v{{major}},value=${{ steps.tests.outputs.stdout }}
+
+    - name: Build and push the Docker image
+      uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
